@@ -201,14 +201,19 @@ class FallbackCrawler:
     on each crawled page until it hits the max_pages limit.
     """
 
-    async def crawl(self, base_url: str, max_pages: int = 100) -> dict[str, str]:
+    async def crawl(
+        self, base_url: str, max_pages: int = 100, start_url: str | None = None
+    ) -> dict[str, str]:
         """Recursively crawl a website by following internal links."""
         pages: dict[str, str] = {}
         visited: set[str] = set()
         domain = urlparse(base_url).netloc
 
-        # Queue starts with priority paths, then discovered links
+        # Queue starts with the exact page the user gave (it may be a landing
+        # page nothing links to), then priority paths, then discovered links
         queue: list[str] = [urljoin(base_url, p) for p in FALLBACK_PATHS]
+        if start_url and start_url not in queue:
+            queue.insert(0, start_url)
 
         async with httpx.AsyncClient(
             timeout=15,
@@ -374,7 +379,9 @@ class Trainer:
             print("[1/6] Crawling website (add CLOUDFLARE_ACCOUNT_ID and")
             print("      CLOUDFLARE_API_TOKEN to .env for deep JS-rendered crawling)...")
             crawler = FallbackCrawler()
-            self.scraped_pages = await crawler.crawl(base_url, max_pages=max_pages)
+            self.scraped_pages = await crawler.crawl(
+                base_url, max_pages=max_pages, start_url=url
+            )
 
         if not self.scraped_pages:
             print("\nERROR: Could not scrape any pages. Check the URL.")
